@@ -1,0 +1,22 @@
+#result {
+	text-align: center;
+}
+
+.box {
+	width: 100%;
+	max-width: 75vh;
+	margin: 20px;
+	display: inline-block;
+}
+
+.title {
+	text-align: center;
+	font-size: 1.5em;
+	margin-bottom: .5em;
+}
+
+#option {
+	position: fixed;
+	right: 1em;
+	bottom: 1em;
+}

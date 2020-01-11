@@ -1,0 +1,16 @@
+path {
+	stroke: none;
+	fill: #333333;
+}
+
+#option {
+	position: fixed;
+	left: 1em;
+	top: 1em;
+}
+
+#pie {
+	position: fixed;
+	right: 1em;
+	bottom: 1em;
+}
