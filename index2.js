@@ -1,5 +1,3 @@
-var voteType = ['tsai','han','song','invalid','novote']
-var colors = ['#1B9431','#000099','#FF6310','#888888']
 var lonmin = 119.34
 var lonmax = 122.01
 var latmin = 21.86
@@ -7,10 +5,15 @@ var latmax = 25.4
 var width = lonmax-lonmin
 var height = latmax-latmin
 var scale = 300
-var novotes = false
-var invalid = true
-var mode = 1
-var casei = 0
+
+var colors = {
+	president: ['#FF6310','#000099','#1B9431'],
+	invalid: '#888888',
+	novote: '#333333'
+}
+
+var typeKey = ['president']
+
 var x = d3.scaleLinear().range([0,width*scale] ).domain([lonmin,lonmax])
 var y = d3.scaleLinear().range([height*scale,0]).domain([latmin,latmax])
 var svg = d3.select('#map').append('svg')
@@ -35,10 +38,19 @@ function drawMap(g,geo){
 	} 
 }
 
-function diffColor(v){ 
+function setColor(value, t, c){
 	var sc = 1
-	if(v>0)return d3.hsl(131,.818,v*.48*sc+.1)+''
-	else return d3.hsl(240,1,-v*.5*sc+.1)+''
+	var color
+	if (c === 0) {
+		var color1 = d3.hsl(colors[typeKey[t]][2])
+		var color2 = d3.hsl(colors[typeKey[t]][1])
+		if (value > 0) return d3.hsl(color1.h, color1.s,  value * .45 * sc + .05) + ''
+		else           return d3.hsl(color2.h, color2.s, -value * .45 * sc + .05) + ''
+	}
+	if (c === -1) color = d3.hsl(colors.invalid)
+	if (c === -2) color = d3.hsl(colors.novote)
+	if (c  >  0 ) color = d3.hsl(colors[typeKey[t]][c-1])
+	return d3.hsl(color.h, color.s, value * .45 * sc + .05) + ''
 }
 
 function drawCounty(){
@@ -74,22 +86,14 @@ function drawPie(){
 		.attr('height', '100%')
 		.attr('viewBox', '-50 -50 100 100')
 
-	var arcs = d3.pie().sortValues(null)([0,0,1,0,0]);
 	var pie = svg.append('g').attr('class','pie')
 	var path = pie.append('g').attr('class','path')
 	var text = pie.append('g').attr('class','text')
-	for (i in [0,0,1,0,0]){
-		path.append('path').attr('class',voteType[i])
-			.style('fill', colors[i])
-		text.append('text').attr('class',voteType[i])
-			.style('fill', 'white')
-			.style('font-size','6px')
-			.attr('text-anchor','middle')
-	}
-	pie.selectAll('path').data(arcs)
-	pie.selectAll('text').data(arcs)
+		.style('fill', 'white')
+		.style('font-size','6px')
+		.attr('text-anchor','middle')
 }
-
+/*
 function drawVillage(){
 	village.features.forEach((e,i,a)=>{
 		var g = svg.append('g')
@@ -98,98 +102,128 @@ function drawVillage(){
 		drawMap(g,e.geometry)
 	})
 }
-
-function changeVoteData(ci){
-	if(mode===0){
-		president.county.forEach((e,i,a)=>{
-			var v = e.votes
-			var county = d3.select('#county'+e.code).data([v])
-			var novotenum = e.total - v.tsai - v.han - v.song - v.invalid
-			var total = v.tsai+v.han+v.song+v.invalid*(invalid?1:0)+novotenum*(novotes?1:0)
-			var diff = (v.tsai-v.han)/total
-			county.selectAll('path').style('fill',diffColor(diff))
-			console.log(total)
-		})
-	}
-	else if(mode===1){
-		president.county.forEach((e,i,a)=>{
-			e.town.forEach((te,ti,ta)=>{
-				var v = te.votes
-				var town = d3.select('#town'+e.code+te.code).data([v])
-				var novotenum = te.total - v.tsai - v.han - v.song - v.invalid
-				var total = v.tsai+v.han+v.song+v.invalid*(invalid?1:0)+novotenum*(novotes?1:0)
-				var diff = (v.tsai-v.han)/total
-				town.selectAll('path').style('fill',diffColor(diff))
-			})
-		})
-	}
-
-
-	var v = president.votes
-	var novotenum = president.total - v.tsai - v.han - v.song - v.invalid
-	var arcs = d3.pie().sortValues(null)(
-		[v.tsai,v.han,v.song,v.invalid*(invalid?1:0),novotenum*(novotes?1:0)]);
-	var arctotal = v.tsai+v.han+v.song+v.invalid*(invalid?1:0)+novotenum*(novotes?1:0)
-	var path = d3.select('#pie').select('g.pie').selectAll('path')
-	var text = d3.select('#pie').select('g.pie').selectAll('text')
-	path.data(arcs).attr('d',arc)
-	text.data(arcs).text(d=>Math.round(d.value*100/arctotal)+'%')
-	text.attr('x',d=>arc.centroid(d)[0]).attr('y',d=>arc.centroid(d)[1]+2)
-	if(novotes) $a('text.novote' ).forEach((e,i,a)=>{e.classList.toggle('hide',false)})
-	else        $a('text.novote' ).forEach((e,i,a)=>{e.classList.toggle('hide',true )})
-	if(invalid) $a('text.invalid').forEach((e,i,a)=>{e.classList.toggle('hide',false)})
-	else        $a('text.invalid').forEach((e,i,a)=>{e.classList.toggle('hide',true )})
+*/
+function arraySum(arr) {
+	var total = 0
+	arr.forEach((e,i,a)=>{ total += e })
+	return total
 }
 
-$('#novotes').addEventListener('change',function() {
-	if(this.checked) {
-		novotes = true
-		invalid = true
-		$('#invalid').checked = true
+function getValue(v, c, o) {
+	var total = arraySum(v.votes)
+	if (o > 0) total += v.invalid
+	if (o > 1) total += v.novote
+	if (c === 0 ) return (v.votes[2] - v.votes[1]) / total
+	if (c === -1) return v.invalid / total
+	if (c === -2) return 1 - v.novote / total
+	if (c  >  0 ) return v.votes[c-1] / total
+	return 0
+}
+
+function changeVoteData(){
+	var m = parseInt($('#mode' ).value)
+	var t = parseInt($('#type' ).value)
+	var c = parseInt($('#cand' ).value)
+	var o = parseInt($('#other').value)
+
+	if (m) {
+		data.county.forEach((e,i,a)=>{
+			e.town.forEach((te,ti,ta)=>{
+				var v = te[typeKey[t]]
+				var value = getValue(v, c, o)
+				var town = d3.select('#town'+e.code+te.code).data([v])
+				town.selectAll('path').style('fill',setColor(value, t, c))
+			})
+		})
+	} else {
+		data.county.forEach((e,i,a)=>{
+			var v = e[typeKey[t]]
+			var value = getValue(v, c, o)
+			var county = d3.select('#county'+e.code).data([v])
+			county.selectAll('path').style('fill',setColor(value, t, c))
+		})
 	}
-	else novotes = false
-	changeVoteData(casei)
-})
 
-$('#invalid').addEventListener('change',function() {
-	if(this.checked) invalid = true
-	else {
-		invalid = false
-		novotes = false
-		$('#novotes').checked = false
+	var v = data[typeKey[t]]
+	var arr = []
+	var path = d3.select('#pie').select('g.path')
+	var text = d3.select('#pie').select('g.text')
+	path.selectAll('path').remove()
+	text.selectAll('text').remove()
+	v.votes.forEach((e,i,a)=>{
+		arr.push(e)
+		path.append('path').style('fill',colors[typeKey[t]][i])
+		text.append('text')
+	})
+	if (o > 0) {
+		arr.push(v.invalid)
+		path.append('path').style('fill',colors.invalid)
+		text.append('text')
 	}
-	changeVoteData(casei)
-})
+	if (o > 1) {
+		arr.push(v.novote)
+		path.append('path').style('fill',colors.novote)
+		text.append('text')
+	}
+	var arcs = d3.pie().sortValues(null)(arr)
+	var total = arraySum(arr)
 
-$('#casenum').addEventListener('change',function() {
-	casei = parseInt(this.value)
-	changeVoteData(casei)
-})
+	path.selectAll('path').data(arcs).attr('d',arc)
+	text.selectAll('text').data(arcs)
+		.attr('x',d=>arc.centroid(d)[0]).attr('y',d=>arc.centroid(d)[1]+2)
+		.text(d=>Math.round(d.value*1000/total)/10+'%')
+}
 
-$('#mode').addEventListener('change',function() {
-	mode = parseInt(this.value)
-	if (mode===0){
+function setMode(m) {
+	if (m) {
+		d3.selectAll('.county').style('display','none')
+		d3.selectAll('.town'  ).style('display','initial')
+	} else {
 		d3.selectAll('.county').style('display','initial')
 		d3.selectAll('.town'  ).style('display','none')
 	}
-	else if (mode===1) {
-		d3.selectAll('.county').style('display','none')
-		d3.selectAll('.town'  ).style('display','initial')
-	}
-	changeVoteData(casei)
+}
+
+function setCand(t) {
+	var c = parseInt($('#cand').value)
+	var candidate = d3.select('#cand')
+	candidate.selectAll('option').remove()
+	candidate.append('option').text('預設').attr('value', 0)
+	data[typeKey[t]].info.forEach((e,i,a)=>{
+		candidate.append('option').text(e.index + '. ' + e.name).attr('value', e.index)
+	})
+	candidate.append('option').text('廢票').attr('value', -1)
+	candidate.append('option').text('投票率').attr('value', -2)
+	if (c > 0) $('#cand').value = 0
+	else $('#cand').value = c
+}
+
+$('#other').addEventListener('change',function() {
+	changeVoteData()
+})
+
+$('#mode').addEventListener('change',function() {
+	setMode(parseInt(this.value))
+	changeVoteData()
+})
+
+$('#type').addEventListener('change',function() {
+	setCand(parseInt(this.value))
+	changeVoteData()
+})
+
+$('#cand').addEventListener('change',function() {
+	if (parseInt(this.value) === -1 && parseInt($('#other').value) === 0)
+		$('#other').value = 1
+	if (parseInt(this.value) === -2 && parseInt($('#other').value)  <  2)
+		$('#other').value = 2
+	changeVoteData()
 })
 
 drawPie()
 drawCounty()
 drawTown()
 //drawVillage()
-if (mode===0){
-	d3.selectAll('.county').style('display','initial')
-	d3.selectAll('.town'  ).style('display','none')
-}
-else if (mode===1) {
-	d3.selectAll('.county').style('display','none')
-	d3.selectAll('.town'  ).style('display','initial')
-}
 
-changeVoteData(casei)
+setCand(parseInt($('#type').value))
+changeVoteData()
