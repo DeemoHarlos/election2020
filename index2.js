@@ -7,12 +7,16 @@ var height = latmax-latmin
 var scale = 300
 
 var colors = {
-	president: ['#FF6310','#000099','#1B9431'],
+	president: [ '#FF6310','#000099','#1B9431' ],
+	party: [ '#FF0000', '#000080', '#FF6310', '#633f99', '#A73f24',
+	         '#F9BE01', '#FFDB00', '#009e96', '#000099', '#5BBEDE',
+	         '#FF0000', '#99E64D', '#EAD9A5', '#1B9431', '#28C8C8',
+	         '#51458B', '#77AEA5', '#FFEA00', '#AB6300' ],
 	invalid: '#888888',
-	novote: '#333333'
+	novote : '#333333'
 }
 
-var typeKey = ['president']
+var typeKey = ['president', 'party']
 
 var x = d3.scaleLinear().range([0,width*scale] ).domain([lonmin,lonmax])
 var y = d3.scaleLinear().range([height*scale,0]).domain([latmin,latmax])
@@ -23,7 +27,7 @@ var arc = d3.arc()
 	.innerRadius(30)
 	.outerRadius(50)
 	.cornerRadius(1)
-	.padAngle(.01)
+	.padAngle(0.002)
 
 function drawMap(g,geo){
 	if(geo.type === 'MultiPolygon'){
@@ -36,21 +40,6 @@ function drawMap(g,geo){
 		g.append('path').data(geo.coordinates)
 		 .attr('d',d3.line().x(d=>x(d[0])).y(d=>y(d[1])))
 	} 
-}
-
-function setColor(value, t, c){
-	var sc = 1
-	var color
-	if (c === 0) {
-		var color1 = d3.hsl(colors[typeKey[t]][2])
-		var color2 = d3.hsl(colors[typeKey[t]][1])
-		if (value > 0) return d3.hsl(color1.h, color1.s,  value * .45 * sc + .05) + ''
-		else           return d3.hsl(color2.h, color2.s, -value * .45 * sc + .05) + ''
-	}
-	if (c === -1) color = d3.hsl(colors.invalid)
-	if (c === -2) color = d3.hsl(colors.novote)
-	if (c  >  0 ) color = d3.hsl(colors[typeKey[t]][c-1])
-	return d3.hsl(color.h, color.s, value * .45 * sc + .05) + ''
 }
 
 function drawCounty(){
@@ -109,15 +98,30 @@ function arraySum(arr) {
 	return total
 }
 
-function getValue(v, c, o) {
+function getValue(v, t, c, o) {
 	var total = arraySum(v.votes)
 	if (o > 0) total += v.invalid
 	if (o > 1) total += v.novote
-	if (c === 0 ) return (v.votes[2] - v.votes[1]) / total
+	if (c === 0 ) return (v.votes[t?13:2] - v.votes[t? 8:1]) / total
 	if (c === -1) return v.invalid / total
 	if (c === -2) return 1 - v.novote / total
 	if (c  >  0 ) return v.votes[c-1] / total
 	return 0
+}
+
+function setColor(value, t, c, min, max){
+	var sc = 1 / (max > -min ? max : -min)
+	if (c === 0) {
+		var color1 = d3.hsv(colors[typeKey[t]][t?13:2])
+		var color2 = d3.hsv(colors[typeKey[t]][t? 8:1])
+		if (value > 0) return d3.hsv(color1.h, color1.s,  value * .95 * sc + .05) + ''
+		else           return d3.hsv(color2.h, color2.s, -value * .95 * sc + .05) + ''
+	}
+	var color = d3.hsv('#000000')
+	if (c === -1) color = d3.hsv(colors.invalid)
+	if (c === -2) color = d3.hsv(colors.novote)
+	if (c  >  0 ) color = d3.hsv(colors[typeKey[t]][c-1])
+	return d3.hsv(color.h, color.s, value * .95 * sc + .05) + ''
 }
 
 function changeVoteData(){
@@ -125,22 +129,31 @@ function changeVoteData(){
 	var t = parseInt($('#type' ).value)
 	var c = parseInt($('#cand' ).value)
 	var o = parseInt($('#other').value)
+	var min, max;
+
+	data.county.forEach((e,i,a)=>{
+		e.town.forEach((te,ti,ta)=>{
+			var value = getValue(te[typeKey[t]], t, c, o)
+			if (min === undefined || value < min) min = value
+			if (max === undefined || value > max) max = value
+		})
+	})
 
 	if (m) {
 		data.county.forEach((e,i,a)=>{
 			e.town.forEach((te,ti,ta)=>{
 				var v = te[typeKey[t]]
-				var value = getValue(v, c, o)
+				var value = getValue(v, t, c, o)
 				var town = d3.select('#town'+e.code+te.code).data([v])
-				town.selectAll('path').style('fill',setColor(value, t, c))
+				town.selectAll('path').style('fill',setColor(value, t, c, min, max))
 			})
 		})
 	} else {
 		data.county.forEach((e,i,a)=>{
 			var v = e[typeKey[t]]
-			var value = getValue(v, c, o)
+			var value = getValue(v, t, c, o)
 			var county = d3.select('#county'+e.code).data([v])
-			county.selectAll('path').style('fill',setColor(value, t, c))
+			county.selectAll('path').style('fill',setColor(value, t, c, min, max))
 		})
 	}
 
@@ -199,6 +212,10 @@ function setCand(t) {
 }
 
 $('#other').addEventListener('change',function() {
+	if (parseInt(this.value) === 0 && parseInt($('#cand').value) < 0)
+		$('#cand').value = 0
+	if (parseInt(this.value) === 1 && parseInt($('#cand').value) === -2)
+		$('#cand').value = -1
 	changeVoteData()
 })
 
