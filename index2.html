@@ -28,11 +28,28 @@
 			<option value="1">不分區立委</option>
 		</select><br>
 		<select name="cand" id="cand">
-			<option value="0" selected>預設</option>
+			<option value="0" selected>綠藍差距</option>
 		</select>
 	</div>
 	<div id="map"></div>
-	<div id="pie"></div>
+	<div id="pie">
+		<svg viewBox="-50 -50 100 100">
+			<g id="pietext">
+				<text x="0" y="-14" text-anchor="middle" id="pietype"></text>
+				<text x="0" y="-7" text-anchor="middle" id="piecand"></text>
+				<text x="0" y="6" text-anchor="middle" id="pievalue"></text>
+				<text x="0" y="18" text-anchor="middle" id="piename">全國</text>
+			</g>
+			<g id="pie1" class="pie">
+				<g class="path"></g>
+				<g class="text" text-anchor="middle"></g>
+			</g>
+			<g id="pie2" class="pie">
+				<g class="path"></g>
+				<g class="text" text-anchor="middle"></g>
+			</g>
+		</svg>
+	</div>
 	<script src="county.json" type="text/javascript"></script>
 	<script src="town.json" type="text/javascript"></script>
 	<script src="data.json" type="text/javascript"></script>

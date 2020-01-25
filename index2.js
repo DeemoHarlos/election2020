@@ -17,17 +17,25 @@ var colors = {
 }
 
 var typeKey = ['president', 'party']
+var typeName = ['正副總統', '不分區立委']
 
 var x = d3.scaleLinear().range([0,width*scale] ).domain([lonmin,lonmax])
 var y = d3.scaleLinear().range([height*scale,0]).domain([latmin,latmax])
 var svg = d3.select('#map').append('svg')
             .attr('width', width*scale)
             .attr('height', height*scale)
-var arc = d3.arc()
-	.innerRadius(30)
-	.outerRadius(50)
-	.cornerRadius(1)
-	.padAngle(0.002)
+var arc = [
+	d3.arc()
+		.innerRadius(29.5)
+		.outerRadius(25)
+		.cornerRadius(0)
+		.padAngle(0), 
+	d3.arc()
+		.innerRadius(30)
+		.outerRadius(50)
+		.cornerRadius(0)
+		.padAngle(0)
+]
 
 function drawMap(g,geo){
 	if(geo.type === 'MultiPolygon'){
@@ -42,12 +50,26 @@ function drawMap(g,geo){
 	} 
 }
 
+function hoverUpdate(d) {
+	var t = parseInt($('#type' ).value)
+	var c = parseInt($('#cand' ).value)
+	var o = parseInt($('#other').value)
+	drawPie(d, 2, t, o)
+	d3.select('#piename' ).text(d === data ? '全國' : d.name)
+	var value = getValue(d[typeKey[t]], t, c, o)
+	d3.select('#pievalue').text(Math.round(value*1000)/10 + '%')
+}
+
 function drawCounty(){
+	var counties = svg.append('g').attr('id', 'counties')
 	county.features.forEach((e,i,a)=>{
-		var g = svg.append('g')
-		           .attr('id','county' + e.properties.COUNTYCODE)
-		           .attr('class','county')
+		var g = counties.append('g')
+			.attr('id','county' + e.properties.COUNTYCODE)
+			.attr('class','county')
 		drawMap(g,e.geometry)
+		var d = data.county.find(cty=>cty.code === e.properties.COUNTYCODE)
+		g.on('mouseover', function() { hoverUpdate(d   ) })
+		g.on('mouseout' , function() { hoverUpdate(data) })
 	})
 	d3.select('#county09007').attr('transform','translate(100,320)')
 	d3.select('#county09020').attr('transform','translate(400,0)')
@@ -58,40 +80,22 @@ function drawCounty(){
 }
 
 function drawTown(){
+	var towns = svg.append('g').attr('id', 'towns')
 	town.features.forEach((e,i,a)=>{
-		var g = svg.append('g')
-		           .attr('id','town' + e.properties.TOWNCODE.slice(0,7))
-		           .attr('class','town county' + e.properties.TOWNCODE.slice(0,5))
+		var g = towns.append('g')
+			.attr('id','town' + e.properties.TOWNCODE.slice(0,7))
+			.attr('class','town county' + e.properties.TOWNCODE.slice(0,5))
 		drawMap(g,e.geometry)
+		var d1 = data.county.find(cty=>cty.code === e.properties.COUNTYCODE)
+		var d  = d1  .town  .find(twn=>d1.code+twn.code+'0' === e.properties.TOWNCODE)
+		g.on('mouseover', function() { hoverUpdate(d   ) })
+		g.on('mouseout' , function() { hoverUpdate(data) })
 	})
 	d3.selectAll('.county09007').attr('transform','translate(100,320)')
 	d3.selectAll('.county09020').attr('transform','translate(400,0)')
 	d3.select('#town0902006').attr('transform','translate(150,100)')
 }
 
-function drawPie(){
-	var svg = d3.select('body').select('#pie').append('svg')
-		.attr('width', '100%')
-		.attr('height', '100%')
-		.attr('viewBox', '-50 -50 100 100')
-
-	var pie = svg.append('g').attr('class','pie')
-	var path = pie.append('g').attr('class','path')
-	var text = pie.append('g').attr('class','text')
-		.style('fill', 'white')
-		.style('font-size','6px')
-		.attr('text-anchor','middle')
-}
-/*
-function drawVillage(){
-	village.features.forEach((e,i,a)=>{
-		var g = svg.append('g')
-		           .attr('id',e.properties.VILLAGEID + e.properties.VILLAGENAME)
-		           .attr('class','village')
-		drawMap(g,e.geometry)
-	})
-}
-*/
 function arraySum(arr) {
 	var total = 0
 	arr.forEach((e,i,a)=>{ total += e })
@@ -122,6 +126,38 @@ function setColor(value, t, c, min, max){
 	if (c === -2) color = d3.hsv(colors.novote)
 	if (c  >  0 ) color = d3.hsv(colors[typeKey[t]][c-1])
 	return d3.hsv(color.h, color.s, value * .95 * sc + .05) + ''
+}
+
+function drawPie(d, i, t, o) {
+	var v = d[typeKey[t]]
+	var arr = []
+	var path = d3.select(`#pie${i}`).select('g.path')
+	var text = d3.select(`#pie${i}`).select('g.text')
+	path.selectAll('path').remove()
+	text.selectAll('text').remove()
+	v.votes.forEach((e,i,a)=>{
+		arr.push(e)
+		path.append('path').style('fill',colors[typeKey[t]][i])
+		text.append('text')
+	})
+	if (o > 0) {
+		arr.push(v.invalid)
+		path.append('path').style('fill',colors.invalid)
+		text.append('text')
+	}
+	if (o > 1) {
+		arr.push(v.novote)
+		path.append('path').style('fill',colors.novote)
+		text.append('text')
+	}
+	var arcs = d3.pie().sortValues(null)(arr)
+	var total = arraySum(arr)
+
+	path.selectAll('path').data(arcs).attr('d',arc[i-1])
+	text.selectAll('text').data(arcs)
+		.attr('x',d=>arc[i-1].centroid(d)[0]).attr('y',d=>arc[i-1].centroid(d)[1]+2)
+		.text(d=>Math.round(d.value*1000/total)/10 + '%')
+		.style('display', d=>(d.value*1000/total < 30 || i === 1) ? 'none' : 'initial')
 }
 
 function changeVoteData(){
@@ -157,43 +193,27 @@ function changeVoteData(){
 		})
 	}
 
-	var v = data[typeKey[t]]
-	var arr = []
-	var path = d3.select('#pie').select('g.path')
-	var text = d3.select('#pie').select('g.text')
-	path.selectAll('path').remove()
-	text.selectAll('text').remove()
-	v.votes.forEach((e,i,a)=>{
-		arr.push(e)
-		path.append('path').style('fill',colors[typeKey[t]][i])
-		text.append('text')
-	})
-	if (o > 0) {
-		arr.push(v.invalid)
-		path.append('path').style('fill',colors.invalid)
-		text.append('text')
-	}
-	if (o > 1) {
-		arr.push(v.novote)
-		path.append('path').style('fill',colors.novote)
-		text.append('text')
-	}
-	var arcs = d3.pie().sortValues(null)(arr)
-	var total = arraySum(arr)
-
-	path.selectAll('path').data(arcs).attr('d',arc)
-	text.selectAll('text').data(arcs)
-		.attr('x',d=>arc.centroid(d)[0]).attr('y',d=>arc.centroid(d)[1]+2)
-		.text(d=>Math.round(d.value*1000/total)/10+'%')
+	d3.select('#piename' ).text('全國')
+	var value = getValue(data[typeKey[t]], t, c, o)
+	d3.select('#pievalue').text(Math.round(value*1000)/10 + '%')
+	d3.select('#pietype' ).text(typeName[t])
+	var cand
+	     if (c ===  0) cand = '綠藍差距'
+	else if (c === -1) cand = '廢票'
+	else if (c === -2) cand = '投票率'
+	else               cand = c + '. ' + data[typeKey[t]].info[c-1].name
+	d3.select('#piecand' ).text(cand)
+	drawPie(data, 1, t, o)
+	drawPie(data, 2, t, o)
 }
 
 function setMode(m) {
 	if (m) {
-		d3.selectAll('.county').style('display','none')
-		d3.selectAll('.town'  ).style('display','initial')
+		d3.select('#counties').style('display','none')
+		d3.select('#towns'   ).style('display','initial')
 	} else {
-		d3.selectAll('.county').style('display','initial')
-		d3.selectAll('.town'  ).style('display','none')
+		d3.select('#counties').style('display','initial')
+		d3.select('#towns'   ).style('display','none')
 	}
 }
 
@@ -201,7 +221,7 @@ function setCand(t) {
 	var c = parseInt($('#cand').value)
 	var candidate = d3.select('#cand')
 	candidate.selectAll('option').remove()
-	candidate.append('option').text('預設').attr('value', 0)
+	candidate.append('option').text('綠藍差距').attr('value', 0)
 	data[typeKey[t]].info.forEach((e,i,a)=>{
 		candidate.append('option').text(e.index + '. ' + e.name).attr('value', e.index)
 	})
@@ -211,7 +231,7 @@ function setCand(t) {
 	else $('#cand').value = c
 }
 
-$('#other').addEventListener('change',function() {
+d3.select('#other').on('change',function() {
 	if (parseInt(this.value) === 0 && parseInt($('#cand').value) < 0)
 		$('#cand').value = 0
 	if (parseInt(this.value) === 1 && parseInt($('#cand').value) === -2)
@@ -219,17 +239,17 @@ $('#other').addEventListener('change',function() {
 	changeVoteData()
 })
 
-$('#mode').addEventListener('change',function() {
+d3.select('#mode').on('change',function() {
 	setMode(parseInt(this.value))
 	changeVoteData()
 })
 
-$('#type').addEventListener('change',function() {
+d3.select('#type').on('change',function() {
 	setCand(parseInt(this.value))
 	changeVoteData()
 })
 
-$('#cand').addEventListener('change',function() {
+d3.select('#cand').on('change',function() {
 	if (parseInt(this.value) === -1 && parseInt($('#other').value) === 0)
 		$('#other').value = 1
 	if (parseInt(this.value) === -2 && parseInt($('#other').value)  <  2)
@@ -237,10 +257,8 @@ $('#cand').addEventListener('change',function() {
 	changeVoteData()
 })
 
-drawPie()
 drawCounty()
 drawTown()
-//drawVillage()
 
 setCand(parseInt($('#type').value))
 changeVoteData()

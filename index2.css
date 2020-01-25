@@ -16,3 +16,36 @@ path {
 	width: 300px;
 	height: 300px;
 }
+
+#pietext text, .pie text {
+	font-family: sans-serif;
+	font-weight: bold;
+	stroke: black;
+	stroke-width: .1px;
+	fill: white;
+}
+
+.pie text{
+	font-size: 6px;
+}
+
+#pietype {
+	font-size: 5px;
+}
+
+#piecand {
+	font-size: 5px;
+}
+
+#pievalue {
+	font-size: 14px;
+}
+
+#piename {
+	font-size: 6px;
+}
+
+.county:hover path, .town:hover path{
+	stroke: white;
+	stroke-width: 2px;
+}
